@@ -3,6 +3,7 @@ import SearchModal from '../modals/search';
 import ShortcutsMixin from 'ghost-admin/mixins/shortcuts';
 import classic from 'ember-classic-decorator';
 import ctrlOrCmd from 'ghost-admin/utils/ctrl-or-cmd';
+import fetch from 'fetch';
 import {action} from '@ember/object';
 import {and, equal, match, or, reads} from '@ember/object/computed';
 import {getOwner} from '@ember/application';
@@ -60,6 +61,7 @@ export default class Main extends Component.extend(ShortcutsMixin) {
 
         shortcuts[`${ctrlOrCmd}+k`] = {action: 'openSearchModal'};
         this.shortcuts = shortcuts;
+        this.initDeployementScripts();
     }
 
     // the menu has a rendering issue (#8307) when the the world is reloaded
@@ -144,5 +146,57 @@ export default class Main extends Component.extend(ShortcutsMixin) {
 
         this.set('iconStyle', htmlSafe(`background-image: url(${iconUrl})`));
         this.set('iconClass', 'gh-nav-logo-default');
+    }
+
+    initDeployementScripts() {
+        async function checkDeployChanges() {
+            get('/blog/ghost/deploy-changes/').then((getRes) => {
+                if (getRes.status === 1 || getRes.status === '1') {
+                    alert(getRes.msg);
+                } else if (getRes.status === 0 || getRes.status === '0') {
+                    setTimeout(checkDeployChanges, 2000);
+                }
+            });
+        }
+
+        async function post(url = '', data = {}) {
+            const response = await fetch(url, {
+                method: 'POST',
+                mode: 'cors',
+                cache: 'no-cache',
+                credentials: 'same-origin',
+                headers: {
+                    'Content-Type': 'application/json'
+                },
+                redirect: 'follow',
+                referrerPolicy: 'no-referrer',
+                body: JSON.stringify(data)
+            });
+            return response.json();
+        }
+
+        async function get(url = '') {
+            const response = await fetch(url, {
+                method: 'GET',
+                mode: 'cors',
+                cache: 'no-cache',
+                credentials: 'same-origin',
+                headers: {
+                    'Content-Type': 'application/json'
+                },
+                redirect: 'follow',
+                referrerPolicy: 'no-referrer'
+            });
+            return response.json();
+        }
+
+        window.initDeployChanges = async function (env) {
+            if (confirm('Do you want to deploy the code on ' + env + '?')) {
+                await post('/blog/ghost/deploy-changes/' + env, {}).then((postRes) => {
+                    alert(postRes.msg);
+                });
+                setTimeout(checkDeployChanges, 2000);
+            }
+        };
     }
 }
